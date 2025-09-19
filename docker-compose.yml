@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  wpic:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_DATABASE_URL=postgresql://wpic:password@postgres:5432/wpic
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./uploads:/app/uploads
+      - ./.env:/app/.env
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: wpic
+      POSTGRES_USER: wpic
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:

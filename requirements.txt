@@ -1,0 +1,39 @@
+# FastAPI 核心依赖
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+
+# 数据库和ORM (使用兼容版本)
+sqlalchemy>=1.4.0,<2.0
+databases[postgresql,mysql]>=0.6.0
+asyncpg>=0.25.0  # PostgreSQL异步驱动
+aiomysql>=0.1.0  # MySQL异步驱动
+alembic>=1.8.0  # 数据库迁移
+
+# Redis缓存
+redis[hiredis]>=4.0.0
+
+# 文件处理和图像
+Pillow>=9.0.0
+python-multipart>=0.0.5
+aiofiles>=22.0.0
+
+# 存储后端
+boto3>=1.20.0  # S3存储
+aiobotocore>=2.0.0  # 异步S3客户端
+webdavclient3>=3.14.0  # WebDAV客户端
+aiohttp>=3.8.0  # HTTP客户端
+
+# 安全和认证
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# 配置管理
+pydantic-settings>=2.0.0
+python-dotenv>=0.19.0
+
+# 实用工具
+pydantic>=2.0.0
+httpx>=0.24.0
+
+# 图片格式支持（可选）
+pillow-heif>=0.10.0
