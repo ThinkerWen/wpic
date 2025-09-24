@@ -112,7 +112,10 @@ class AuthManager:
             Optional[User]: 用户对象，认证失败时返回None
         """
         try:
-            user = await User.objects.get(username=username, is_active=True)
+            from app.crud.user import get_user_by_username
+            user = await get_user_by_username(username)
+            if not user or not user.is_active:
+                return None
             if not self.verify_password(password, user.password_hash):
                 return None
             return user
@@ -263,8 +266,9 @@ class AuthManager:
             user: 用户对象
             size_delta: 大小变化（字节，可为负数）
         """
+        from app.crud.user import update_user
         new_usage = max(0, user.storage_used + size_delta)
-        await user.update(storage_used=new_usage, updated_at=datetime.utcnow())
+        await update_user(user.id, storage_used=new_usage)
     
     def generate_api_key(self, user_id: int) -> str:
         """生成API密钥
@@ -299,13 +303,15 @@ class AuthManager:
         # 这里简化实现，实际应该在数据库中存储API密钥
         # 暂时通过缓存来模拟
         try:
+            from app.crud.user import get_user_by_id
             # 从缓存中获取API密钥对应的用户ID
             cached_user_data = await cache_manager.get_user_session(api_key)
             if cached_user_data:
                 user_id = cached_user_data.get("user_id")
                 if user_id:
-                    user = await User.objects.get(id=user_id, is_active=True)
-                    return user
+                    user = await get_user_by_id(user_id)
+                    if user and user.is_active:
+                        return user
             return None
         except:
             return None
@@ -369,8 +375,24 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
         )
     
     try:
-        user = await User.objects.get(id=int(user_id), is_active=True)
-        return user
+        from app.crud.user import get_user_by_id
+        user = await get_user_by_id(int(user_id))
+        if user and user.is_active:
+            return user
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="用户不存在或已禁用",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="令牌格式错误",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except HTTPException:
+        raise
     except:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -417,7 +439,15 @@ async def verify_file_access(file_id: int,
         HTTPException: 无权限或文件不存在时抛出
     """
     try:
-        file_record = await FileRecord.objects.select_related("user").get(id=file_id)
+        from app.crud.file import get_file_by_id
+        file_record = await get_file_by_id(file_id)
+        if not file_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="文件不存在"
+            )
+    except HTTPException:
+        raise
     except:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -11,8 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 
 from app.core.config import get_settings
-from app.core.database import init_database, close_database, create_all_tables
+from app.core.database import init_database, close_database, create_all_tables, create_default_admin
 from app.core.cache import init_cache, close_cache
+from app.core.logger import logger
 from app.api.router import api_router
 
 settings = get_settings()
@@ -22,30 +23,33 @@ settings = get_settings()
 async def lifespan(app_main: FastAPI):
     """应用生命周期管理"""
     # 启动时初始化
-    print("🚀 启动 WPIC 图床后端服务...")
+    logger.info("🚀 启动 WPIC 图床后端服务...")
     
     # 初始化数据库连接
     await init_database()
-    print("✅ 数据库连接已建立")
+    logger.info("✅ 数据库连接已建立")
     
     # 创建数据库表
     await create_all_tables()
-    print("✅ 数据库表已创建")
+    logger.info("✅ 数据库表已创建")
     
     # 初始化Redis缓存
     await init_cache()
-    print("✅ Redis缓存已连接")
+    logger.info("✅ Redis缓存已连接")
     
-    print(f"🎯 服务启动完成，访问地址: http://{settings.app.host}:{settings.app.port}")
-    print(f"📚 API文档地址: http://{settings.app.host}:{settings.app.port}/docs")
+    # 创建默认管理员用户
+    await create_default_admin()
+    
+    logger.info(f"🎯 服务启动完成，访问地址: http://{settings.app.host}:{settings.app.port}")
+    logger.info(f"📚 API文档地址: http://{settings.app.host}:{settings.app.port}/docs")
     
     yield
     
     # 关闭时清理
-    print("🛑 正在关闭服务...")
+    logger.info("🛑 正在关闭服务...")
     await close_cache()
     await close_database()
-    print("✅ 服务已关闭")
+    logger.info("✅ 服务已关闭")
 
 
 # 创建FastAPI应用

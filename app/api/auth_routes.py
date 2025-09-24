@@ -23,8 +23,10 @@ cache_manager = get_cache_manager()
 async def register(user_data: UserCreate):
     """用户注册"""
     try:
+        from app.crud.user import get_user_by_username, get_user_by_email, create_user
+        
         # 检查用户名是否已存在
-        existing_user = await User.objects.filter(username=user_data.username).first()
+        existing_user = await get_user_by_username(user_data.username)
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -32,7 +34,7 @@ async def register(user_data: UserCreate):
             )
         
         # 检查邮箱是否已存在
-        existing_email = await User.objects.filter(email=user_data.email).first()
+        existing_email = await get_user_by_email(user_data.email)
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -40,15 +42,20 @@ async def register(user_data: UserCreate):
             )
         
         # 创建用户
-        password_hash = auth_manager.get_password_hash(user_data.password)
-        user = await User.objects.create(
+        user = await create_user(
             username=user_data.username,
             email=user_data.email,
-            password_hash=password_hash,
+            password=user_data.password,
             storage_type=user_data.storage_type,
             storage_config=user_data.storage_config,
             storage_quota=user_data.storage_quota
         )
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="创建用户失败"
+            )
         
         # 转换为响应模型
         return UserResponse(

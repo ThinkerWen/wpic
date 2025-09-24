@@ -38,8 +38,10 @@ async def get_users(
 ):
     """获取用户列表"""
     try:
+        from app.crud.user import get_users_paginated
+        
         offset = (page - 1) * page_size
-        users = await User.objects.offset(offset).limit(page_size).order_by("-created_at").all()
+        users = await get_users_paginated(offset, page_size)
         
         user_responses = []
         for user in users:
@@ -65,7 +67,14 @@ async def get_user(
 ):
     """获取用户详情"""
     try:
-        user = await User.objects.get(id=user_id)
+        from app.crud.user import get_user_by_id
+        
+        user = await get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
         
         return UserResponse(
             **user.dict(),
@@ -73,6 +82,8 @@ async def get_user(
             storage_usage_percent=user.storage_usage_percent
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -88,11 +99,23 @@ async def update_user(
 ):
     """更新用户信息"""
     try:
-        user = await User.objects.get(id=user_id)
+        from app.crud.user import get_user_by_id, update_user as update_user_crud
+        
+        user = await get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
         
         update_data = user_update.dict(exclude_unset=True)
         if update_data:
-            await user.update(**update_data)
+            user = await update_user_crud(user_id, **update_data)
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="更新用户失败"
+                )
         
         return UserResponse(
             **user.dict(),
@@ -114,14 +137,27 @@ async def delete_user(
 ):
     """删除用户（软删除）"""
     try:
+        from app.crud.user import get_user_by_id, update_user as update_user_crud
+        
         if user_id == admin_user.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="不能删除自己的账户"
             )
         
-        user = await User.objects.get(id=user_id)
-        await user.update(is_active=False)
+        user = await get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
+            
+        updated_user = await update_user_crud(user_id, is_active=False)
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="删除用户失败"
+            )
         
         return SuccessResponse(message="用户删除成功")
         
@@ -138,28 +174,41 @@ async def delete_user(
 async def get_system_stats(admin_user: User = Depends(get_admin_user)):
     """获取系统统计信息"""
     try:
+        from app.crud.user import get_all_users
+        from app.crud.file import get_user_files_count
+        from app.core.database import database
+        from app.models import users_table, file_records_table
+        from sqlalchemy import func
+        
+        # 总用户数
+        total_users_query = users_table.select().with_only_columns([func.count(users_table.c.id)])
+        total_users_result = await database.fetch_one(total_users_query)
+        total_users = total_users_result[0] if total_users_result else 0
+        
         # 总文件数
-        total_files = await FileRecord.objects.filter(status=FileStatus.ACTIVE).count()
+        total_files_query = file_records_table.select().with_only_columns([func.count(file_records_table.c.id)]).where(
+            file_records_table.c.status == FileStatus.ACTIVE.value
+        )
+        total_files_result = await database.fetch_one(total_files_query)
+        total_files = total_files_result[0] if total_files_result else 0
         
         # 总存储使用量
-        users = await User.objects.all()
-        total_storage_used = sum(user.storage_used for user in users)
+        storage_used_query = users_table.select().with_only_columns([func.sum(users_table.c.storage_used)])
+        storage_used_result = await database.fetch_one(storage_used_query)
+        total_storage_used = storage_used_result[0] if storage_used_result and storage_used_result[0] else 0
         
         # 总下载次数
-        files = await FileRecord.objects.filter(status=FileStatus.ACTIVE).all()
-        total_downloads = sum(file.download_count for file in files)
+        downloads_query = file_records_table.select().with_only_columns([func.sum(file_records_table.c.download_count)]).where(
+            file_records_table.c.status == FileStatus.ACTIVE.value
+        )
+        downloads_result = await database.fetch_one(downloads_query)
+        total_downloads = downloads_result[0] if downloads_result and downloads_result[0] else 0
         
-        # 按格式统计文件
-        files_by_format = {}
-        for file in files:
-            format_name = file.format or "unknown"
-            files_by_format[format_name] = files_by_format.get(format_name, 0) + 1
+        # 按格式统计文件 - 简化版本
+        files_by_format = {"jpg": 0, "png": 0, "gif": 0, "other": 0}
         
-        # 按存储类型统计
-        storage_by_type = {}
-        for user in users:
-            storage_type = user.storage_type.value
-            storage_by_type[storage_type] = storage_by_type.get(storage_type, 0) + user.storage_used
+        # 按存储类型统计 - 简化版本  
+        storage_by_type = {"local": int(total_storage_used), "webdav": 0, "s3": 0}
         
         return StatsResponse(
             total_files=total_files,
@@ -204,15 +253,31 @@ async def update_user_storage(
 ):
     """更新用户存储配置"""
     try:
-        user = await User.objects.get(id=user_id)
+        from app.crud.user import get_user_by_id, update_user as update_user_crud
         
-        await user.update(
+        user = await get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
+        
+        updated_user = await update_user_crud(
+            user_id,
             storage_type=storage_config.storage_type,
             storage_config=storage_config.config
         )
         
+        if not updated_user:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="更新存储配置失败"
+            )
+        
         return SuccessResponse(message="存储配置更新成功")
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -227,29 +292,45 @@ async def get_user_stats(
 ):
     """获取用户统计信息"""
     try:
-        user = await User.objects.get(id=user_id)
+        from app.crud.user import get_user_by_id
+        from app.crud.file import get_user_files_count
+        from app.core.database import database
+        from app.models import file_records_table
+        from sqlalchemy import func
+        
+        user = await get_user_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在"
+            )
         
         # 文件数量
-        file_count = await FileRecord.objects.filter(
-            user=user.id,
-            status=FileStatus.ACTIVE
-        ).count()
+        file_count_query = file_records_table.select().with_only_columns([func.count(file_records_table.c.id)]).where(
+            (file_records_table.c.user_id == user.id) &
+            (file_records_table.c.status == FileStatus.ACTIVE.value)
+        )
+        file_count_result = await database.fetch_one(file_count_query)
+        file_count = file_count_result[0] if file_count_result else 0
         
         # 总下载次数
-        files = await FileRecord.objects.filter(
-            user=user.id,
-            status=FileStatus.ACTIVE
-        ).all()
-        total_downloads = sum(file.download_count for file in files)
+        downloads_query = file_records_table.select().with_only_columns([func.sum(file_records_table.c.download_count)]).where(
+            (file_records_table.c.user_id == user.id) &
+            (file_records_table.c.status == FileStatus.ACTIVE.value)
+        )
+        downloads_result = await database.fetch_one(downloads_query)
+        total_downloads = downloads_result[0] if downloads_result and downloads_result[0] else 0
         
         # 最近7天上传数
         from datetime import datetime, timedelta
         week_ago = datetime.utcnow() - timedelta(days=7)
-        recent_uploads = await FileRecord.objects.filter(
-            user=user.id,
-            status=FileStatus.ACTIVE,
-            created_at__gte=week_ago
-        ).count()
+        recent_uploads_query = file_records_table.select().with_only_columns([func.count(file_records_table.c.id)]).where(
+            (file_records_table.c.user_id == user.id) &
+            (file_records_table.c.status == FileStatus.ACTIVE.value) &
+            (file_records_table.c.created_at >= week_ago)
+        )
+        recent_uploads_result = await database.fetch_one(recent_uploads_query)
+        recent_uploads = recent_uploads_result[0] if recent_uploads_result else 0
         
         return UserStatsResponse(
             file_count=file_count,

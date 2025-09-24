@@ -1,6 +1,6 @@
 """
 数据库模型定义
-使用SQLAlchemy Core (不依赖Ormar)
+使用SQLAlchemy Core
 """
 from datetime import datetime
 from enum import Enum
@@ -57,6 +57,21 @@ class User:
         self.is_active = kwargs.get('is_active', True)
         self.created_at = kwargs.get('created_at', datetime.utcnow())
         self.updated_at = kwargs.get('updated_at', datetime.utcnow())
+    
+    def dict(self) -> dict:
+        """转换为字典格式"""
+        return {
+            'id': self.id,
+            'username': self.username,
+            'email': self.email,
+            'storage_type': self.storage_type,
+            'storage_config': self.storage_config,
+            'storage_quota': self.storage_quota,
+            'storage_used': self.storage_used,
+            'is_active': self.is_active,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at
+        }
     
     @property
     def remaining_storage(self) -> int:

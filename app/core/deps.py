@@ -47,7 +47,8 @@ def get_current_user_optional(
     
     try:
         import asyncio
-        return asyncio.run(User.objects.get(id=int(user_id), is_active=True))
+        from app.crud.user import get_user_by_id
+        return asyncio.run(get_user_by_id(int(user_id)))
     except:
         return None
 
@@ -85,8 +86,14 @@ async def verify_file_access_dep(
 ) -> FileRecord:
     """验证文件访问权限依赖"""
     try:
-        file_record = await FileRecord.objects.select_related("user").get(id=file_id)
-    except:
+        from app.crud.file import get_file_by_id
+        file_record = await get_file_by_id(file_id)
+        if not file_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="文件不存在"
+            )
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="文件不存在"

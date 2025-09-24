@@ -4,13 +4,18 @@
 from datetime import datetime
 from typing import Optional, List
 
-from app.models import FileRecord, FileStatus
+from app.core.database import database
+from app.models import FileRecord, FileStatus, file_records_table
 
 
 async def get_file_by_id(file_id: int) -> Optional[FileRecord]:
     """根据ID获取文件"""
     try:
-        return await FileRecord.objects.select_related("user").get(id=file_id)
+        query = file_records_table.select().where(file_records_table.c.id == file_id)
+        result = await database.fetch_one(query)
+        if result:
+            return FileRecord(**dict(result))
+        return None
     except:
         return None
 
@@ -18,18 +23,34 @@ async def get_file_by_id(file_id: int) -> Optional[FileRecord]:
 async def get_file_by_hash(file_hash: str, user_id: int) -> Optional[FileRecord]:
     """根据哈希值获取用户文件"""
     try:
-        return await FileRecord.objects.filter(
-            file_hash=file_hash,
-            user=user_id,
-            status=FileStatus.ACTIVE
-        ).first()
+        query = file_records_table.select().where(
+            (file_records_table.c.file_hash == file_hash) &
+            (file_records_table.c.user_id == user_id) &
+            (file_records_table.c.status == FileStatus.ACTIVE.value)
+        )
+        result = await database.fetch_one(query)
+        if result:
+            return FileRecord(**dict(result))
+        return None
     except:
         return None
 
 
 async def create_file_record(user_id: int, **file_data) -> FileRecord:
     """创建文件记录"""
-    return await FileRecord.objects.create(user=user_id, **file_data)
+    try:
+        file_data['user_id'] = user_id
+        file_data['created_at'] = datetime.utcnow()
+        file_data['updated_at'] = datetime.utcnow()
+        
+        query = file_records_table.insert().values(**file_data)
+        result = await database.execute(query)
+        
+        if result:
+            return await get_file_by_id(result)
+        return None
+    except:
+        return None
 
 
 async def get_user_files(
@@ -39,34 +60,52 @@ async def get_user_files(
     status: Optional[FileStatus] = None
 ) -> List[FileRecord]:
     """获取用户文件列表"""
-    query = FileRecord.objects.filter(user=user_id)
-    
-    if status:
-        query = query.filter(status=status)
-    else:
-        query = query.filter(status=FileStatus.ACTIVE)
-    
-    return await query.offset(skip).limit(limit).order_by("-created_at").all()
+    try:
+        query = file_records_table.select().where(file_records_table.c.user_id == user_id)
+        
+        if status:
+            query = query.where(file_records_table.c.status == status.value)
+        else:
+            query = query.where(file_records_table.c.status == FileStatus.ACTIVE.value)
+        
+        query = query.order_by(file_records_table.c.created_at.desc()).offset(skip).limit(limit)
+        results = await database.fetch_all(query)
+        
+        return [FileRecord(**dict(result)) for result in results]
+    except:
+        return []
 
 
 async def get_user_files_count(user_id: int, status: Optional[FileStatus] = None) -> int:
     """获取用户文件数量"""
-    query = FileRecord.objects.filter(user=user_id)
-    
-    if status:
-        query = query.filter(status=status)
-    else:
-        query = query.filter(status=FileStatus.ACTIVE)
-    
-    return await query.count()
+    try:
+        from sqlalchemy import func
+        query = file_records_table.select([func.count()]).where(file_records_table.c.user_id == user_id)
+        
+        if status:
+            query = query.where(file_records_table.c.status == status.value)
+        else:
+            query = query.where(file_records_table.c.status == FileStatus.ACTIVE.value)
+        
+        result = await database.fetch_one(query)
+        return result[0] if result else 0
+    except:
+        return 0
 
 
 async def update_file_record(file_id: int, **kwargs) -> Optional[FileRecord]:
     """更新文件记录"""
     try:
-        file_record = await FileRecord.objects.get(id=file_id)
-        await file_record.update(**kwargs)
-        return file_record
+        kwargs['updated_at'] = datetime.utcnow()
+        
+        query = file_records_table.update().where(
+            file_records_table.c.id == file_id
+        ).values(**kwargs)
+        
+        result = await database.execute(query)
+        if result:
+            return await get_file_by_id(file_id)
+        return None
     except:
         return None
 
@@ -74,17 +113,23 @@ async def update_file_record(file_id: int, **kwargs) -> Optional[FileRecord]:
 async def delete_file_record(file_id: int, user_id: int) -> bool:
     """删除文件记录（软删除）"""
     try:
-        file_record = await FileRecord.objects.filter(
-            id=file_id,
-            user=user_id,
-            status=FileStatus.ACTIVE
-        ).first()
+        # 先检查文件是否存在且属于该用户
+        query = file_records_table.select().where(
+            (file_records_table.c.id == file_id) &
+            (file_records_table.c.user_id == user_id) &
+            (file_records_table.c.status == FileStatus.ACTIVE.value)
+        )
+        result = await database.fetch_one(query)
         
-        if file_record:
-            await file_record.update(
-                status=FileStatus.DELETED,
+        if result:
+            # 执行软删除
+            update_query = file_records_table.update().where(
+                file_records_table.c.id == file_id
+            ).values(
+                status=FileStatus.DELETED.value,
                 updated_at=datetime.utcnow()
             )
+            await database.execute(update_query)
             return True
         return False
     except:
