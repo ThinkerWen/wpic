@@ -2,9 +2,9 @@
 用户CRUD操作
 """
 from typing import Optional, List
-from sqlalchemy.orm import Session
-from app.models import User
+
 from app.core.security import get_auth_manager
+from app.models import User
 
 
 async def get_user_by_id(user_id: int) -> Optional[User]:

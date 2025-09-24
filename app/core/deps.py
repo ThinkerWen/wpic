@@ -3,15 +3,16 @@
 FastAPI依赖项定义
 """
 from typing import Optional, Generator
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+from app.core.cache import get_cache_manager
 from app.core.config import get_settings
 from app.core.security import get_auth_manager
-from app.core.cache import get_cache_manager
-from app.services.storage_service import get_storage_manager
-from app.services.image_service import get_image_processor
 from app.models import User, FileRecord
+from app.services.image_service import get_image_processor
+from app.services.storage_service import get_storage_manager
 
 settings = get_settings()
 security = HTTPBearer(auto_error=False)

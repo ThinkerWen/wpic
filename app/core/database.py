@@ -4,6 +4,7 @@
 import databases
 import sqlalchemy
 from sqlalchemy import MetaData
+
 from app.core.config import get_settings
 
 settings = get_settings()

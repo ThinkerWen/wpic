@@ -3,9 +3,10 @@
 使用SQLAlchemy Core (不依赖Ormar)
 """
 from datetime import datetime
-from typing import Optional, Dict, Any
 from enum import Enum
-from sqlalchemy import Table, Column, Integer, String, Boolean, DateTime, BigInteger, Text, ForeignKey, JSON
+
+from sqlalchemy import Table, Column, Integer, String, Boolean, DateTime, BigInteger, ForeignKey, JSON
+
 from app.core.database import metadata
 
 

@@ -2,12 +2,12 @@
 Redis缓存模块
 提供文件缓存和缩略图缓存功能
 """
-import redis.asyncio as redis
-import pickle
-import json
-from typing import Optional, Any, Union, Dict
 import hashlib
-from datetime import datetime, timedelta
+import json
+from typing import Optional, Any, Dict
+
+import redis.asyncio as redis
+
 from app.core.config import get_settings
 
 settings = get_settings()

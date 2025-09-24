@@ -4,8 +4,8 @@
 """
 from .base import BaseStorage
 from .local import LocalStorage
-from .webdav import WebDAVStorage
 from .s3 import S3Storage
+from .webdav import WebDAVStorage
 
 __all__ = [
     "BaseStorage",

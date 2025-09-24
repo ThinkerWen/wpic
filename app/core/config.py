@@ -2,11 +2,10 @@
 配置管理模块
 支持从环境变量和配置文件加载设置
 """
-from typing import Optional, Union, Dict, Any
+from typing import Optional
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import os
-from pathlib import Path
 
 
 class DatabaseConfig(BaseSettings):

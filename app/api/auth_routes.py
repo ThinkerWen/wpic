@@ -2,16 +2,17 @@
 认证相关API路由
 """
 from datetime import timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+
 from app.api.schemas import (
-    UserCreate, UserResponse, UserLogin, Token, 
-    ErrorResponse, SuccessResponse
+    UserCreate, UserResponse, Token,
+    SuccessResponse
 )
-from app.models import User
-from app.core.security import get_auth_manager, get_current_user, get_current_active_user
 from app.core.cache import get_cache_manager
-from app.crud import user as user_crud
+from app.core.security import get_auth_manager, get_current_user, get_current_active_user
+from app.models import User
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 auth_manager = get_auth_manager()

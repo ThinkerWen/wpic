@@ -2,14 +2,16 @@
 图片处理模块
 支持多种图片格式的处理和缩略图生成
 """
-import io
 import hashlib
-from typing import Optional, Tuple, Union, Dict, Any
+import io
+from typing import Optional, Tuple, Dict, Any
+
+import pillow_heif
 from PIL import Image, ImageOps, ExifTags
 from PIL.Image import Resampling
-import pillow_heif
-from app.core.config import get_settings
+
 from app.core.cache import get_cache_manager
+from app.core.config import get_settings
 
 settings = get_settings()
 cache_manager = get_cache_manager()

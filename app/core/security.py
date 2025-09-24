@@ -2,17 +2,19 @@
 用户认证和权限控制模块
 支持JWT token认证和文件访问权限控制
 """
-import secrets
 import hashlib
+import secrets
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, Union
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from typing import Optional, Dict, Any
+
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+from app.core.cache import get_cache_manager
 from app.core.config import get_settings
 from app.models import User, FileRecord
-from app.core.cache import get_cache_manager
 
 settings = get_settings()
 cache_manager = get_cache_manager()

@@ -2,10 +2,12 @@
 S3存储后端实现
 支持AWS S3和兼容S3的存储服务
 """
-import boto3
-import aiobotocore.session
-from botocore.exceptions import ClientError, NoCredentialsError
 from typing import Optional, AsyncGenerator, Dict, Any
+
+import aiobotocore.session
+import boto3
+from botocore.exceptions import ClientError
+
 from .base import BaseStorage, StorageException
 
 

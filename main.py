@@ -19,7 +19,7 @@ settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app_main: FastAPI):
     """应用生命周期管理"""
     # 启动时初始化
     print("🚀 启动 WPIC 图床后端服务...")
@@ -140,7 +140,7 @@ async def get_service_info():
 if __name__ == "__main__":
     # 运行服务器
     uvicorn.run(
-        "main:app",
+        app="main:app",
         host=settings.app.host,
         port=settings.app.port,
         reload=settings.app.debug,

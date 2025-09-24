@@ -4,9 +4,9 @@ API路由汇总
 """
 from fastapi import APIRouter
 
+from app.api.admin_routes import router as admin_router
 from app.api.auth_routes import router as auth_router
 from app.api.file_routes import router as file_router
-from app.api.admin_routes import router as admin_router
 
 # 创建主API路由器
 api_router = APIRouter(prefix="/api")

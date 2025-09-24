@@ -1,28 +1,26 @@
 """
 文件管理API路由
 """
-import os
 import hashlib
-from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Optional, List
+from pathlib import Path
+from typing import Optional
+
 from fastapi import (
-    APIRouter, Depends, HTTPException, status, 
+    APIRouter, Depends, HTTPException, status,
     UploadFile, File, Form, Query, Response
 )
-from fastapi.responses import StreamingResponse
+
 from app.api.schemas import (
     FileUploadResponse, FileResponse, FileListResponse,
-    FileShareRequest, FileShareResponse, SuccessResponse,
-    ImageProcessRequest, ThumbnailRequest
+    FileShareRequest, FileShareResponse, SuccessResponse
 )
-from app.models import User, FileRecord, FileStatus, AccessLog
-from app.core.security import get_current_user, get_current_active_user, verify_file_access, get_auth_manager
-from app.services.storage_service import get_storage_manager
-from app.services.image_service import get_image_processor, ImageProcessorException
 from app.core.cache import get_cache_manager
 from app.core.config import get_settings
-from app.crud import file as file_crud
+from app.core.security import get_current_user, get_current_active_user, verify_file_access, get_auth_manager
+from app.models import User, FileRecord, FileStatus
+from app.services.image_service import get_image_processor, ImageProcessorException
+from app.services.storage_service import get_storage_manager
 
 router = APIRouter(prefix="/files", tags=["文件管理"])
 auth_manager = get_auth_manager()

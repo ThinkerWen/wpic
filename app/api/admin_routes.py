@@ -1,17 +1,18 @@
 """
 管理员API路由
 """
-from typing import Optional, List
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+
 from app.api.schemas import (
-    UserResponse, UserUpdate, StatsResponse, 
+    UserResponse, UserUpdate, StatsResponse,
     UserStatsResponse, SuccessResponse, ConfigResponse,
     StorageConfigRequest
 )
-from app.models import User, FileRecord, FileStatus
-from app.core.security import get_current_active_user
 from app.core.config import get_settings
-from app.crud import user as user_crud, file as file_crud
+from app.core.security import get_current_active_user
+from app.models import User, FileRecord, FileStatus
 
 router = APIRouter(prefix="/admin", tags=["管理"])
 settings = get_settings()

@@ -1,9 +1,10 @@
 """
 文件CRUD操作
 """
-from typing import Optional, List
 from datetime import datetime
-from app.models import FileRecord, FileStatus, User
+from typing import Optional, List
+
+from app.models import FileRecord, FileStatus
 
 
 async def get_file_by_id(file_id: int) -> Optional[FileRecord]:

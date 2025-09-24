@@ -58,10 +58,6 @@ pip install -r requirements.txt
 
 复制配置文件并修改：
 
-```bash
-cp config.example.env .env
-```
-
 编辑 `.env` 文件，配置数据库、Redis 等连接信息。
 
 ### 4. 运行服务
