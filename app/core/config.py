@@ -2,17 +2,25 @@
 配置管理模块
 支持从环境变量和配置文件加载设置
 """
+from pathlib import Path
 from typing import Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 项目根目录
+PROJECT_ROOT = Path(__file__).parent.parent.parent
+
 
 class DatabaseConfig(BaseSettings):
     """数据库配置"""
-    model_config = SettingsConfigDict(env_prefix="DB_", extra="ignore")
-    
-    # 数据库URL，支持MySQL和PostgreSQL
+    model_config = SettingsConfigDict(
+        env_prefix="DB_", 
+        extra="ignore",
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8"
+    )
+
     database_url: str = Field(
         default="sqlite:///./app.db",
         description="数据库连接URL"
@@ -21,7 +29,12 @@ class DatabaseConfig(BaseSettings):
 
 class RedisConfig(BaseSettings):
     """Redis配置"""
-    model_config = SettingsConfigDict(env_prefix="REDIS_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="REDIS_", 
+        extra="ignore",
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8"
+    )
     
     host: str = Field(default="localhost", description="Redis主机")
     port: int = Field(default=6379, description="Redis端口")
@@ -31,7 +44,12 @@ class RedisConfig(BaseSettings):
 
 class StorageConfig(BaseSettings):
     """存储配置"""
-    model_config = SettingsConfigDict(env_prefix="STORAGE_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="STORAGE_", 
+        extra="ignore",
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8"
+    )
     
     # 本地存储
     local_base_path: str = Field(default="./uploads", description="本地存储基础路径")
@@ -51,7 +69,12 @@ class StorageConfig(BaseSettings):
 
 class SecurityConfig(BaseSettings):
     """安全配置"""
-    model_config = SettingsConfigDict(env_prefix="SECURITY_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="SECURITY_", 
+        extra="ignore",
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8"
+    )
     
     secret_key: str = Field(
         default="your-secret-key-change-this-in-production",
@@ -64,7 +87,12 @@ class SecurityConfig(BaseSettings):
 
 class AppConfig(BaseSettings):
     """应用配置"""
-    model_config = SettingsConfigDict(env_prefix="APP_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="APP_", 
+        extra="ignore",
+        env_file=str(PROJECT_ROOT / ".env"),
+        env_file_encoding="utf-8"
+    )
     
     title: str = Field(default="WPIC 图床后端", description="应用标题")
     description: str = Field(default="一个功能完整的图床后端服务", description="应用描述")
@@ -93,7 +121,7 @@ class AppConfig(BaseSettings):
 class Settings(BaseSettings):
     """全局设置"""
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -107,10 +135,20 @@ class Settings(BaseSettings):
     security: SecurityConfig = SecurityConfig()
 
 
-# 全局设置实例
-settings = Settings()
+# 全局设置实例 - 使用懒加载避免缓存问题
+_settings: Optional[Settings] = None
 
 
 def get_settings() -> Settings:
     """获取设置实例"""
-    return settings
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
+
+
+def reload_settings():
+    """重新加载配置"""
+    global _settings
+    _settings = None
+    return get_settings()

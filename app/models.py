@@ -5,7 +5,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import Table, Column, Integer, String, Boolean, DateTime, BigInteger, ForeignKey, JSON
+from sqlalchemy import Table, Column, Integer, String, Boolean, DateTime, BigInteger, ForeignKey, JSON, text
 
 from app.core.database import metadata
 
@@ -26,19 +26,19 @@ class FileStatus(str, Enum):
 
 # 用户表定义
 users_table = Table(
-    "users",
+    "wpic_users",
     metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("username", String(50), unique=True, index=True, nullable=False),
-    Column("email", String(100), unique=True, index=True, nullable=False),
-    Column("password_hash", String(255), nullable=False),
-    Column("storage_type", String(20), default=StorageType.LOCAL.value),
-    Column("storage_config", JSON, default={}),
-    Column("storage_quota", BigInteger, default=1024*1024*1024),  # 1GB
-    Column("storage_used", BigInteger, default=0),
-    Column("is_active", Boolean, default=True),
-    Column("created_at", DateTime, default=datetime.utcnow),
-    Column("updated_at", DateTime, default=datetime.utcnow)
+    Column("id", Integer, primary_key=True, autoincrement=True, comment="用户ID，主键"),
+    Column("username", String(50), unique=True, default='', server_default=text("''"), index=True, nullable=False, comment="用户名，唯一索引"),
+    Column("email", String(100), unique=True, default='', server_default=text("''"), index=True, nullable=False, comment="邮箱地址，唯一索引"),
+    Column("password_hash", String(255), default='', server_default=text("''"), nullable=False, comment="密码哈希值"),
+    Column("storage_type", String(20), default=StorageType.LOCAL.value, server_default=text("'local'"), nullable=False, comment="存储类型：local/webdav/s3"),
+    Column("storage_config", JSON, default={}, server_default=text("'{}'"), nullable=False, comment="存储配置信息JSON"),
+    Column("storage_quota", BigInteger, default=1024*1024*100, server_default=text("104857600"), nullable=False, comment="存储配额，单位字节，默认100MB"),
+    Column("storage_used", BigInteger, default=0, server_default=text("0"), nullable=False, comment="已使用存储空间，单位字节"),
+    Column("is_active", Boolean, default=True, server_default=text("1"), nullable=False, comment="用户是否激活"),
+    Column("created_at", DateTime, default=datetime.now, server_default=text("NOW()"), nullable=False, comment="创建时间"),
+    Column("updated_at", DateTime, default=datetime.now, server_default=text("NOW()"), nullable=False, comment="更新时间")
 )
 
 
@@ -55,8 +55,8 @@ class User:
         self.storage_quota = kwargs.get('storage_quota', 1024*1024*1024)
         self.storage_used = kwargs.get('storage_used', 0)
         self.is_active = kwargs.get('is_active', True)
-        self.created_at = kwargs.get('created_at', datetime.utcnow())
-        self.updated_at = kwargs.get('updated_at', datetime.utcnow())
+        self.created_at = kwargs.get('created_at', datetime.now())
+        self.updated_at = kwargs.get('updated_at', datetime.now())
     
     def dict(self) -> dict:
         """转换为字典格式"""
@@ -88,25 +88,25 @@ class User:
 
 # 文件记录表定义
 file_records_table = Table(
-    "file_records",
+    "wpic_file_records",
     metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
-    Column("filename", String(255), index=True, nullable=False),
-    Column("original_filename", String(255), nullable=False),
-    Column("file_path", String(500), nullable=False),
-    Column("file_size", BigInteger, nullable=False),
-    Column("content_type", String(100), nullable=False),
-    Column("file_hash", String(64), index=True, nullable=False),
-    Column("width", Integer, nullable=True),
-    Column("height", Integer, nullable=True),
-    Column("format", String(10), nullable=True),
-    Column("status", String(20), default=FileStatus.ACTIVE.value),
-    Column("access_token", String(255), nullable=True, index=True),
-    Column("download_count", Integer, default=0),
-    Column("created_at", DateTime, default=datetime.utcnow),
-    Column("updated_at", DateTime, default=datetime.utcnow),
-    Column("expires_at", DateTime, nullable=True)
+    Column("id", Integer, primary_key=True, autoincrement=True, comment="文件记录ID，主键"),
+    Column("user_id", Integer, ForeignKey("wpic_users.id"), nullable=False, comment="所属用户ID，外键关联wpic_users.id"),
+    Column("filename", String(255), index=True, nullable=False, comment="文件名，带索引"),
+    Column("original_filename", String(255), nullable=False, comment="原始文件名"),
+    Column("file_path", String(500), nullable=False, comment="文件存储路径"),
+    Column("file_size", BigInteger, nullable=False, comment="文件大小，单位字节"),
+    Column("content_type", String(100), nullable=False, comment="文件MIME类型"),
+    Column("file_hash", String(64), index=True, nullable=False, comment="文件哈希值，用于去重，带索引"),
+    Column("width", Integer, default=0, server_default=text("0"), nullable=False, comment="图片宽度，像素"),
+    Column("height", Integer, default=0, server_default=text("0"), nullable=False, comment="图片高度，像素"),
+    Column("format", String(10), default='', server_default=text("''"), nullable=False, comment="图片格式：jpg/png/gif等"),
+    Column("status", String(20), default=FileStatus.ACTIVE.value, server_default=text("'active'"), nullable=False, comment="文件状态：uploading/active/deleted"),
+    Column("access_token", String(255), default='', server_default=text("''"), nullable=False, index=True, comment="访问令牌，带索引"),
+    Column("download_count", Integer, default=0, server_default=text("0"), nullable=False, comment="下载次数"),
+    Column("created_at", DateTime, default=datetime.now, server_default=text("NOW()"), nullable=False, comment="创建时间"),
+    Column("updated_at", DateTime, default=datetime.now, server_default=text("NOW()"), nullable=False, comment="更新时间"),
+    Column("expires_at", DateTime, nullable=True, comment="过期时间，NULL表示永不过期")
 )
 
 
@@ -123,14 +123,14 @@ class FileRecord:
         self.file_size = kwargs.get('file_size')
         self.content_type = kwargs.get('content_type')
         self.file_hash = kwargs.get('file_hash')
-        self.width = kwargs.get('width')
-        self.height = kwargs.get('height')
-        self.format = kwargs.get('format')
+        self.width = kwargs.get('width', 0)
+        self.height = kwargs.get('height', 0)
+        self.format = kwargs.get('format', '')
         self.status = kwargs.get('status', FileStatus.ACTIVE)
-        self.access_token = kwargs.get('access_token')
+        self.access_token = kwargs.get('access_token', '')
         self.download_count = kwargs.get('download_count', 0)
-        self.created_at = kwargs.get('created_at', datetime.utcnow())
-        self.updated_at = kwargs.get('updated_at', datetime.utcnow())
+        self.created_at = kwargs.get('created_at', datetime.now())
+        self.updated_at = kwargs.get('updated_at', datetime.now())
         self.expires_at = kwargs.get('expires_at')
     
     @property
@@ -138,7 +138,7 @@ class FileRecord:
         """检查文件是否过期"""
         if self.expires_at is None:
             return False
-        return datetime.utcnow() > self.expires_at
+        return datetime.now() > self.expires_at
     
     @property
     def is_image(self) -> bool:
@@ -148,33 +148,33 @@ class FileRecord:
 
 # 上传会话表定义
 upload_sessions_table = Table(
-    "upload_sessions",
+    "wpic_upload_sessions",
     metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("session_id", String(255), unique=True, index=True, nullable=False),
-    Column("user_id", Integer, ForeignKey("users.id"), nullable=False),
-    Column("filename", String(255), nullable=False),
-    Column("total_size", BigInteger, nullable=False),
-    Column("chunk_size", Integer, default=1024*1024),  # 1MB
-    Column("chunks_received", Integer, default=0),
-    Column("total_chunks", Integer, nullable=False),
-    Column("is_completed", Boolean, default=False),
-    Column("temp_path", String(500), nullable=False),
-    Column("created_at", DateTime, default=datetime.utcnow),
-    Column("expires_at", DateTime, nullable=False)
+    Column("id", Integer, primary_key=True, autoincrement=True, comment="上传会话ID，主键"),
+    Column("session_id", String(255), unique=True, index=True, nullable=False, comment="上传会话唯一标识符，唯一索引"),
+    Column("user_id", Integer, ForeignKey("wpic_users.id"), nullable=False, comment="上传用户ID，外键关联wpic_users.id"),
+    Column("filename", String(255), nullable=False, comment="上传文件名"),
+    Column("total_size", BigInteger, nullable=False, comment="文件总大小，单位字节"),
+    Column("chunk_size", Integer, default=1024*1024, server_default=text("1048576"), nullable=False, comment="分块大小，单位字节，默认1MB"),
+    Column("chunks_received", Integer, default=0, server_default=text("0"), nullable=False, comment="已接收分块数量"),
+    Column("total_chunks", Integer, nullable=False, comment="总分块数量"),
+    Column("is_completed", Boolean, default=False, server_default=text("0"), nullable=False, comment="是否上传完成"),
+    Column("temp_path", String(500), nullable=False, comment="临时文件路径"),
+    Column("created_at", DateTime, default=datetime.now, server_default=text("NOW()"), nullable=False, comment="创建时间"),
+    Column("expires_at", DateTime, nullable=False, comment="过期时间")
 )
 
 # 访问日志表定义
 access_logs_table = Table(
-    "access_logs",
+    "wpic_access_logs",
     metadata,
-    Column("id", Integer, primary_key=True, autoincrement=True),
-    Column("file_record_id", Integer, ForeignKey("file_records.id"), nullable=False),
-    Column("ip_address", String(45), nullable=False),  # 支持IPv6
-    Column("user_agent", String(500), nullable=True),
-    Column("referer", String(500), nullable=True),
-    Column("access_type", String(20), nullable=False),  # view, download, thumbnail
-    Column("accessed_at", DateTime, default=datetime.utcnow)
+    Column("id", Integer, primary_key=True, autoincrement=True, comment="访问日志ID，主键"),
+    Column("file_record_id", Integer, ForeignKey("wpic_file_records.id"), nullable=False, comment="文件记录ID，外键关联wpic_file_records.id"),
+    Column("ip_address", String(45), nullable=False, comment="访问者IP地址，支持IPv6"),
+    Column("user_agent", String(500), default='', server_default=text("''"), nullable=False, comment="用户代理字符串"),
+    Column("referer", String(500), default='', server_default=text("''"), nullable=False, comment="引用页面URL"),
+    Column("access_type", String(20), nullable=False, comment="访问类型：view/download/thumbnail"),
+    Column("accessed_at", DateTime, default=datetime.now, server_default=text("NOW()"), nullable=False, comment="访问时间")
 )
 
 
@@ -193,13 +193,13 @@ class UploadSession:
         self.total_chunks = kwargs.get('total_chunks')
         self.is_completed = kwargs.get('is_completed', False)
         self.temp_path = kwargs.get('temp_path')
-        self.created_at = kwargs.get('created_at', datetime.utcnow())
+        self.created_at = kwargs.get('created_at', datetime.now())
         self.expires_at = kwargs.get('expires_at')
     
     @property
     def is_expired(self) -> bool:
         """检查上传会话是否过期"""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now() > self.expires_at
     
     @property
     def progress_percent(self) -> float:
@@ -217,7 +217,7 @@ class AccessLog:
         self.file_record_id = kwargs.get('file_record_id')
         self.file_record = kwargs.get('file_record')
         self.ip_address = kwargs.get('ip_address')
-        self.user_agent = kwargs.get('user_agent')
-        self.referer = kwargs.get('referer')
+        self.user_agent = kwargs.get('user_agent', '')
+        self.referer = kwargs.get('referer', '')
         self.access_type = kwargs.get('access_type')
-        self.accessed_at = kwargs.get('accessed_at', datetime.utcnow())
+        self.accessed_at = kwargs.get('accessed_at', datetime.now())

@@ -8,16 +8,43 @@ from sqlalchemy import MetaData
 from app.core.config import get_settings
 from app.core.logger import logger
 
-settings = get_settings()
-
-# 创建数据库连接
-database = databases.Database(settings.database.database_url)
+# 延迟初始化，避免在导入时就获取配置
+_database = None
+_engine = None
 
 # 创建元数据
 metadata = MetaData()
 
-# 创建SQLAlchemy引擎
-engine = sqlalchemy.create_engine(settings.database.database_url)
+
+def get_database():
+    """获取数据库连接实例"""
+    global _database
+    if _database is None:
+        settings = get_settings()
+        _database = databases.Database(settings.database.database_url)
+    return _database
+
+
+def get_engine():
+    """获取SQLAlchemy引擎实例"""
+    global _engine
+    if _engine is None:
+        settings = get_settings()
+        # 为MySQL连接添加额外选项
+        engine_options = {}
+        if settings.database.database_url.startswith(('mysql', 'mysql+')):
+            engine_options.update({
+                'pool_pre_ping': True,
+                'pool_recycle': 3600,
+                'connect_args': {'charset': 'utf8mb4'}
+            })
+        _engine = sqlalchemy.create_engine(settings.database.database_url, **engine_options)
+    return _engine
+
+
+# 获取实例
+database = get_database()
+engine = get_engine()
 
 
 # 初始化数据库连接
@@ -59,22 +86,28 @@ async def create_default_admin():
     try:
         from app.models import users_table, User
         from app.core.security import get_auth_manager
+        from datetime import datetime
         
         # 检查是否已存在admin用户
         query = users_table.select().where(users_table.c.username == "admin")
         result = await database.fetch_one(query)
         
         if result is None:
-            # 创建默认admin用户
             auth_manager = get_auth_manager()
             password_hash = auth_manager.get_password_hash("123456")
+            now = datetime.now()
             
             query = users_table.insert().values(
                 username="admin",
                 email="admin@localhost",
                 password_hash=password_hash,
+                storage_type="local",  # 显式设置存储类型
+                storage_config={},     # 显式设置存储配置
                 storage_quota=10 * 1024 * 1024 * 1024,  # 10GB
-                is_active=True
+                storage_used=0,        # 显式设置已使用空间
+                is_active=True,        # 显式设置激活状态
+                created_at=now,        # 显式设置创建时间
+                updated_at=now         # 显式设置更新时间
             )
             
             await database.execute(query)
