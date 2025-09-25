@@ -22,7 +22,7 @@ class DatabaseConfig(BaseSettings):
     )
 
     database_url: str = Field(
-        default="sqlite:///./app.db",
+        default="sqlite:///./wpic.db",
         description="数据库连接URL"
     )
 

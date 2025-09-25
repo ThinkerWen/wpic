@@ -338,6 +338,6 @@ def clean_expired_files(files: List, current_time: Optional[datetime] = None) ->
     return [
         f for f in files 
         if not hasattr(f, 'expires_at') or 
-           f.expires_at is None or 
+           not f.expires_at or
            f.expires_at > current_time
     ]

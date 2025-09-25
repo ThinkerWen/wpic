@@ -71,52 +71,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 注册路由
-app.include_router(api_router)
-
-# 静态文件配置
-web_dist_path = os.path.join(os.path.dirname(__file__), "web", "dist")
-if os.path.exists(web_dist_path):
-    # 挂载静态文件
-    app.mount("/assets", StaticFiles(directory=os.path.join(web_dist_path, "assets")), name="assets")
-    
-    # 处理前端路由
-    @app.get("/{path:path}", include_in_schema=False)
-    async def serve_frontend(request: Request, path: str):
-        """
-        服务前端应用
-        对于非 API 路径，返回 index.html 让前端路由处理
-        """
-        # API 路径跳过
-        if path.startswith("api/") or path.startswith("docs") or path.startswith("redoc"):
-            raise HTTPException(status_code=404, detail="Not Found")
-        
-        # 检查是否是静态资源文件
-        static_file_path = os.path.join(web_dist_path, path)
-        if os.path.isfile(static_file_path):
-            return FileResponse(static_file_path)
-        
-        # 其他路径返回 index.html，让前端路由处理
-        index_path = os.path.join(web_dist_path, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
-        else:
-            raise HTTPException(status_code=404, detail="Frontend not built")
-
-
-@app.get("/", include_in_schema=False)
-async def root():
-    """根路径"""
-    # 如果前端已构建，直接返回前端页面
-    if os.path.exists(web_dist_path):
-        index_path = os.path.join(web_dist_path, "index.html")
-        if os.path.exists(index_path):
-            return FileResponse(index_path)
-    
-    # 否则重定向到API文档
-    return RedirectResponse(url="/docs")
-
-
+# 系统级API路由 - 必须在通配符路由之前定义
 @app.get("/health", tags=["系统"])
 async def health_check():
     """健康检查接口"""
@@ -139,6 +94,55 @@ async def get_service_info():
         "allowed_extensions": settings.app.allowed_extensions,
         "supported_storage": ["local", "webdav", "s3"]
     }
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """根路径"""
+    # 静态文件配置
+    web_dist_path = os.path.join(os.path.dirname(__file__), "web", "dist")
+    
+    # 如果前端已构建，直接返回前端页面
+    if os.path.exists(web_dist_path):
+        index_path = os.path.join(web_dist_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+    
+    # 否则重定向到API文档
+    return RedirectResponse(url="/docs")
+
+
+# 注册API路由
+app.include_router(api_router, prefix="/v1")
+
+# 静态文件配置 - 必须在通配符路由之前
+web_dist_path = os.path.join(os.path.dirname(__file__), "web", "dist")
+if os.path.exists(web_dist_path):
+    # 挂载静态文件
+    app.mount("/assets", StaticFiles(directory=os.path.join(web_dist_path, "assets")), name="assets")
+    
+    # 处理前端路由 - 通配符路由必须放在最后
+    @app.get("/{path:path}", include_in_schema=False)
+    async def serve_frontend(request: Request, path: str):
+        """
+        服务前端应用
+        对于非 API 路径，返回 index.html 让前端路由处理
+        """
+        # API 路径跳过
+        if path.startswith("api/") or path.startswith("docs") or path.startswith("redoc") or path == "health" or path == "info":
+            raise HTTPException(status_code=404, detail="Not Found")
+        
+        # 检查是否是静态资源文件
+        static_file_path = os.path.join(web_dist_path, path)
+        if os.path.isfile(static_file_path):
+            return FileResponse(static_file_path)
+        
+        # 其他路径返回 index.html，让前端路由处理
+        index_path = os.path.join(web_dist_path, "index.html")
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        else:
+            raise HTTPException(status_code=404, detail="Frontend not built")
 
 
 if __name__ == "__main__":
