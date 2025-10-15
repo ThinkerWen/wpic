@@ -113,7 +113,7 @@ async def root():
 
 
 # 注册API路由
-app.include_router(api_router)
+app.include_router(api_router, prefix="/v1")
 
 # 静态文件配置 - 必须在通配符路由之前
 web_dist_path = os.path.join(os.path.dirname(__file__), "web", "dist")
